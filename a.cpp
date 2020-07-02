@@ -483,8 +483,6 @@ void search(Board x)
 
       default:
         break;
-
-        break;
       }
     }
   }
