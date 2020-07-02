@@ -158,7 +158,7 @@ int f;
 
 void search(Board x)
 {
-  priority_queue<pair<int, Board>, vector<pair<int, Board>>, greater<pair<int, Board>>> PQ;
+  priority_queue<pair<int, Board>, vector<pair<int, Board> >, greater<pair<int, Board> > > PQ;
   vector<Board> visited;
   /*幅優先探索をするときに必要なプライオリティーキューであるPQ。PQには、pair<int,Board>を入れる。pairのfirstの値を比較し、小さなものから取り出していくが、もしpairのfirstの値が同じだった場合は、classの部分で書いた通り、同じものの中から適当に取り出される。
   　すでに探索された状態を再度探索しないために既に訪れた状態を記憶しておく必要がある。記憶の領域をvectorにして、
