@@ -1,11 +1,13 @@
 #include <iostream>
 #include <cstdio>
 #include <vector>
+#include <cmath>
+#include <algorithm>
 using namespace std;
 
 const int Ntiles = 16;
 const int Width = 4;
-#define LIMIT 200
+#define LIMIT 100
 
 int input_;
 
@@ -93,7 +95,7 @@ public:
   friend bool search(State);
 };
 
-typedef struct State *Undo;
+typedef class State *Undo;
 
 class Optab : public State
 {
@@ -117,7 +119,7 @@ public:
       {
         Y[i].push_back(i + 1);
       }
-      if (i % Ntiles - Width)
+      if (i < Ntiles - Width)
       {
         Y[i].push_back(i + Width);
       }
@@ -133,7 +135,6 @@ public:
   {
     return Y[i][j];
   }
-
 } optab;
 
 vector<State> State::EXPAND(State s)
@@ -169,7 +170,7 @@ State State::KID(int newblank)
 
 int mdincr(int tile, int newblank, int blank)
 {
-  return -abs(blank % 4) - abs(blank / 4) - abs(tile % 4 - newblank % 4) - abs(tile / 4 - newblank / 4) + abs(newblank % 4) + abs(newblank / 4) + abs(tile / 4 - blank / 4) + abs(tile % 4 - blank % 4);
+  return abs(newblank % 4) + abs(newblank / 4) + abs(tile / 4 - blank / 4) + abs(tile % 4 - blank % 4) - abs(blank % 4) - abs(blank / 4) - abs(tile % 4 - newblank % 4) - abs(tile / 4 - newblank / 4);
 }
 
 State *APPLY(State &x, int newblank)
@@ -178,7 +179,6 @@ State *APPLY(State &x, int newblank)
 
   u->h = x.h;
   u->blank = x.blank;
-  int tile = x.X[newblank];
 
   for (int i = 0; i < 16; i++)
   {
@@ -186,7 +186,8 @@ State *APPLY(State &x, int newblank)
   }
 
   swap(x.X[x.blank], x.X[newblank]);
-  x.h += mdincr(tile, newblank, x.blank);
+
+  x.h += mdincr(x.X[x.blank], newblank, x.blank);
   x.blank = newblank;
 
   return u;
@@ -207,7 +208,7 @@ void UNDO(State &x, Undo u)
 
 int nops;
 vector<State> vec;
-int Min;
+int tmp;
 
 bool dfs(State x, int depth, int limit, int prev)
 {
@@ -218,23 +219,22 @@ bool dfs(State x, int depth, int limit, int prev)
 
   if (depth + x.h > limit)
   {
-    if (Min > depth + x.h)
-      Min = depth + x.h - limit;
     return false;
   }
 
   nops = NOPS(x);
 
-  x.show(0);
-
   for (int i = 0; i < nops; i++)
   {
     Undo u;
 
-    u = APPLY(x, NTHOP(x, i));
+    tmp = NTHOP(x, i);
+
+    u = APPLY(x, tmp);
 
     if (x.blank == prev)
     {
+      UNDO(x, u);
       continue;
     }
 
@@ -251,15 +251,11 @@ bool dfs(State x, int depth, int limit, int prev)
 
 bool search(State x)
 {
-  int f = x.h;
-
-  Min = 1001001001;
-
-  for (int limit = f; limit <= LIMIT; limit += Min)
+  for (int limit = x.h; limit <= LIMIT; limit++)
   {
     vec.clear();
 
-    if (dfs(x, 0, limit, x.h))
+    if (dfs(x, 0, limit, x.blank))
     {
       return true;
     }
@@ -270,6 +266,8 @@ bool search(State x)
   }
   return false;
 }
+
+int t;
 
 int main(void)
 {
