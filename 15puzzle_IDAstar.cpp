@@ -5,6 +5,10 @@
 #include <algorithm>
 using namespace std;
 
+/***
+論文にはC++ templeteを用いた高速化の話が掲載されていましたが、それについては考慮できていません。
+***/
+
 const int Ntiles = 16;
 const int Width = 4;
 #define LIMIT 100
@@ -90,7 +94,7 @@ public:
 
   friend int NTHOP(State, int);
 
-  friend State *APPLY(State &, int);
+  friend void APPLY(State &, int, State *);
 
   friend int mdincr(int, int, int);
 
@@ -171,10 +175,8 @@ int mdincr(int tile, int newblank, int blank)
 }
 /*論文のFigure 3で書かれていた関数のmdincrです。これを使うことで、交換されたピースのみマンハッタン距離を計算することができ、いちいち全ての盤面についてマンハッタン距離を計算する必要がなくなります。*/
 
-State *APPLY(State &x, int newblank)
+void APPLY(State &x, int newblank, Undo u)
 {
-  Undo u = new State;
-
   u->h = x.h;
   u->blank = x.blank;
 
@@ -188,10 +190,8 @@ State *APPLY(State &x, int newblank)
 
   x.h += mdincr(x.X[x.blank], newblank, x.blank);
   x.blank = newblank;
-
-  return u;
 }
-/*論文のFigure 3で書かれていた関数のAPPLYです。StateのポインタであるUndoを作成して、それが指すStateにxを保存します。そして、xにピースの交換の操作を施した後、Undoを返す仕様になっています。*/
+/*論文のFigure 3で書かれていた関数のAPPLYです。StateのポインタであるUndoを受け取って、それが指すStateにxを保存します。そして、xにピースの交換の操作を施します。*/
 
 void UNDO(State &x, Undo u)
 {
@@ -231,13 +231,13 @@ bool dfs(State x, int depth, int limit, int prev)
 
   for (int i = 0; i < nops; i++)
   {
-    Undo u;
+    Undo u = new State;
     /*xがもしダメだった場合に戻るためのUndo uをここで定義します。*/
 
     tmp = NTHOP(x, i);
     /*newblank、つまり、現在のxのblankと交換してこれからblankになる場所を表す数字をtmpに入れます。*/
 
-    u = APPLY(x, tmp);
+    APPLY(x, tmp, u);
     /*APPLYを使って交換します。xがダメだった時に戻れるように、uにxの交換前の状態を入れておきます。*/
 
     if (x.blank == prev)
@@ -250,6 +250,7 @@ bool dfs(State x, int depth, int limit, int prev)
     if (dfs(x, depth + 1, limit, u->blank))
     {
       /*depthには、現在のdepthに１足したもの、prevには、交換前のblankの位置、つまりu->blankを入れて再帰の計算をします。もし成功したら、vecに入れて、true(=深さ優先探索が成功したことを意味する)を返します。*/
+      delete u;
       vec.push_back(x);
       return true;
     }
@@ -279,8 +280,6 @@ bool search(State x)
   return false;
   /*全ての深さ優先探索が失敗したらfalseで終了します。*/
 }
-
-int t;
 
 int main(void)
 {
