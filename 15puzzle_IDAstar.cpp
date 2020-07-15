@@ -55,7 +55,7 @@ public:
     printf("\n");
   }
 
-  void input()
+  void input(void)
   {
     for (int i = 0; i < 16; i++)
     {
@@ -68,17 +68,13 @@ public:
     return;
   }
 
-  bool isgoal()
+  bool isgoal(void)
   {
     for (int i = 0; i < 16; i++)
       if (X[i] != i)
         return false;
     return true;
   }
-
-  vector<State> EXPAND(State);
-
-  State KID(int);
 
   friend int NOPS(State);
 
@@ -135,19 +131,9 @@ public:
   {
     return Y[i][j];
   }
-} optab;
+};
 
-vector<State> State::EXPAND(State s)
-{
-  vector<State> kids;
-
-  for (int i = 0; i < optab.number(blank); i++)
-  {
-    kids.push_back(KID(optab.op(blank, i)));
-  }
-
-  return kids;
-}
+Optab optab;
 
 int NOPS(State s)
 {
@@ -159,15 +145,6 @@ int NTHOP(State s, int n)
   return optab.op(s.blank, n);
 }
 
-State State::KID(int newblank)
-{
-  State kid = *this;
-  swap(kid.X[blank], kid.X[newblank]);
-  kid.h = manhattan_dist(kid.X);
-  kid.blank = newblank;
-  return kid;
-}
-
 int mdincr(int tile, int newblank, int blank)
 {
   return abs(newblank % 4) + abs(newblank / 4) + abs(tile / 4 - blank / 4) + abs(tile % 4 - blank % 4) - abs(blank % 4) - abs(blank / 4) - abs(tile % 4 - newblank % 4) - abs(tile / 4 - newblank / 4);
@@ -175,14 +152,14 @@ int mdincr(int tile, int newblank, int blank)
 
 State *APPLY(State &x, int newblank)
 {
-  Undo u = new State();
+  Undo u = new State;
 
   u->h = x.h;
   u->blank = x.blank;
 
-  for (int i = 0; i < 16; i++)
+  for (int j = 0; j < 16; j++)
   {
-    u->X[i] = x.X[i];
+    u->X[j] = x.X[j];
   }
 
   swap(x.X[x.blank], x.X[newblank]);
@@ -253,8 +230,6 @@ bool search(State x)
 {
   for (int limit = x.h; limit <= LIMIT; limit++)
   {
-    vec.clear();
-
     if (dfs(x, 0, limit, x.blank))
     {
       return true;
