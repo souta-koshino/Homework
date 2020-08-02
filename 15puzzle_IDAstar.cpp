@@ -3,6 +3,7 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <chrono>
 using namespace std;
 
 /***
@@ -94,9 +95,7 @@ public:
 
   friend int NTHOP(State, int);
 
-  friend void APPLY(State &, int, State *);
-
-  friend int mdincr(int, int, int);
+  friend State *APPLY(State &, int);
 
   friend void UNDO(State &, State *);
 
@@ -108,11 +107,15 @@ public:
 typedef class State *Undo;
 /*論文で紹介されていたOpaque Pointerです。*/
 
+vector<State> vec;
+/*nopsとtmpは以下のdfsで使う変数です、vecは成功した場合のパスとして、交換過程を保存するvector<State>です。*/
+
 /*以下のクラスは、論文の"Operator Pre-computation"の章に書かれていたoperator tableを表すクラスです。*/
 class Optab : public State
 {
 private:
-  vector<int> Y[16];
+  int Y[16][4];
+  int num[16];
   /*Y[i]がblankがiの時にblankを交換させることのできるピースの位置を保存するvectorです。*/
   /*例えば、Y[0]の場合だと、blank=0は左上を指しますから、1と4が入っています。*/
 
@@ -121,29 +124,31 @@ public:
   {
     for (int i = 0; i < 16; i++)
     {
+      int c = -1;
       if (i >= Width)
       {
-        Y[i].push_back(i - Width);
+        Y[i][++c] = i - Width;
       }
       if (i % Width > 0)
       {
-        Y[i].push_back(i - 1);
+        Y[i][++c] = i - 1;
       }
       if (i % Width < Width - 1)
       {
-        Y[i].push_back(i + 1);
+        Y[i][++c] = i + 1;
       }
       if (i < Ntiles - Width)
       {
-        Y[i].push_back(i + Width);
+        Y[i][++c] = i + Width;
       }
+      num[i] = ++c;
     }
   }
   /*論文の通りに実装したつもりです*/
 
   int number(int i)
   {
-    return Y[i].size();
+    return num[i];
   }
   /*Y[i]に入っている数字の個数(=移動可能なパズルの状態の個数)を返すメソッドnumber*/
 
@@ -155,7 +160,6 @@ public:
 };
 
 Optab optab;
-/*一度Optabのインスタンスを作成して、それを使い回せば、いちいち4つのif文の処理をしていないことになります。*/
 
 int NOPS(State s)
 {
@@ -175,8 +179,10 @@ int mdincr(int tile, int newblank, int blank)
 }
 /*論文のFigure 3で書かれていた関数のmdincrです。これを使うことで、交換されたピースのみマンハッタン距離を計算することができ、いちいち全ての盤面についてマンハッタン距離を計算する必要がなくなります。*/
 
-void APPLY(State &x, int newblank, Undo u)
+Undo APPLY(State &x, int newblank)
 {
+  Undo u = new State();
+
   u->h = x.h;
   u->blank = x.blank;
 
@@ -190,6 +196,8 @@ void APPLY(State &x, int newblank, Undo u)
 
   x.h += mdincr(x.X[x.blank], newblank, x.blank);
   x.blank = newblank;
+
+  return u;
 }
 /*論文のFigure 3で書かれていた関数のAPPLYです。StateのポインタであるUndoを受け取って、それが指すStateにxを保存します。そして、xにピースの交換の操作を施します。*/
 
@@ -207,10 +215,11 @@ void UNDO(State &x, Undo u)
 }
 /*論文のFigure 3で書かれていた関数のUNDOです。xをUndo uの状態と同じにする、つまり交換された状態を元に戻します。そして、使い終わったUndo uをdeleteで削除します。*/
 
-int nops;
-vector<State> vec;
+int next_limit, limit;
 int tmp;
-/*nopsとtmpは以下のdfsで使う変数です、vecは成功した場合のパスとして、交換過程を保存するvector<State>です。*/
+int number;
+int nops;
+Undo u_;
 
 bool dfs(State x, int depth, int limit, int prev)
 {
@@ -222,6 +231,7 @@ bool dfs(State x, int depth, int limit, int prev)
 
   if (depth + x.h > limit)
   {
+    next_limit = min(next_limit, depth + x.h);
     return false;
   }
   /*xのf=g+hがlimitを超えたらその状態はダメなのでfalseを返します。*/
@@ -231,32 +241,23 @@ bool dfs(State x, int depth, int limit, int prev)
 
   for (int i = 0; i < nops; i++)
   {
-    Undo u = new State;
-    /*xがもしダメだった場合に戻るためのUndo uをここで定義します。*/
-
-    tmp = NTHOP(x, i);
-    /*newblank、つまり、現在のxのblankと交換してこれからblankになる場所を表す数字をtmpに入れます。*/
-
-    APPLY(x, tmp, u);
+    u_ = APPLY(x, NTHOP(x, i));
+    number++;
     /*APPLYを使って交換します。xがダメだった時に戻れるように、uにxの交換前の状態を入れておきます。*/
 
     if (x.blank == prev)
     {
-      UNDO(x, u);
+      UNDO(x, u_);
       continue;
       /*prevは、xの前のblankを表します。もしこれが今のxのblankと同じだったら、論文でいう2-Cycleの状態になりますので、非効率です。なのでそれを抑制します。*/
     }
 
-    if (dfs(x, depth + 1, limit, u->blank))
+    if (dfs(x, depth + 1, limit, u_->blank))
     {
       /*depthには、現在のdepthに１足したもの、prevには、交換前のblankの位置、つまりu->blankを入れて再帰の計算をします。もし成功したら、vecに入れて、true(=深さ優先探索が成功したことを意味する)を返します。*/
-      delete u;
       vec.push_back(x);
       return true;
     }
-
-    UNDO(x, u);
-    /*この交換(iで表されている)の先の全ての探索が失敗したら、xを元に戻します。*/
   }
   return false;
   /*もし、全ての交換についての探索が失敗したら、深さ優先探索が失敗したことを表すfalseを返します。*/
@@ -264,18 +265,40 @@ bool dfs(State x, int depth, int limit, int prev)
 
 bool search(State x)
 {
-  for (int limit = x.h; limit <= LIMIT; limit++)
-  /*limitを1ずつインクリメントしてlimitをdeepeningします。本当は1ずつのインクリメントである必要はなかったように思いますが、どのように実装するべきかわからなかったので、このような仕様にしました。*/
+  number = 0;
+  chrono::system_clock::time_point start, end;
+  start = chrono::system_clock::now();
+
+  limit = x.h;
+
+  while (true)
   {
+    next_limit = 1001001001;
+
     if (dfs(x, 0, limit, -1))
     /*dfsにdepthは0に、prevは存在しないので-1にして深さ優先探索をします。*/
     {
+      end = std::chrono::system_clock::now();
+
+      int tim = chrono::duration_cast<chrono::milliseconds>(end - start).count();
+
+      int num_per_tim = number / tim * 1000;
+
+      printf("生成されたノードの総数は %d です\n", number);
+      printf("かかった時間は %.0d (sec) です\n", tim);
+
+      printf("一秒間に展開されるノードの数は ");
+      printf("%d", num_per_tim);
+      printf(" です。\n");
+
       return true;
+
+      if (next_limit > 50)
+      {
+        return false;
+      }
     }
-    else
-    {
-      continue;
-    }
+    limit = next_limit;
   }
   return false;
   /*全ての深さ優先探索が失敗したらfalseで終了します。*/
@@ -284,20 +307,18 @@ bool search(State x)
 int main(void)
 {
   State x;
+
   x.input();
 
   if (search(x))
   {
     int count = 0;
-
     reverse(vec.begin(), vec.end());
-
     for (vector<State>::iterator ite = vec.begin(); ite != vec.end(); ite++)
     {
       count++;
       (*ite).show(count);
     }
-    /*もしIDAsearchがうまくいったら、vecの中身をプリントして、交換過程を表示します。*/
   }
   else
     cout << "fail";
