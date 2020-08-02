@@ -93,7 +93,7 @@ public:
 
   friend int NOPS(State);
 
-  friend int NTHOP(State, int);
+  friend int NTHOP(State);
 
   friend State *APPLY(State &, int);
 
@@ -107,71 +107,33 @@ public:
 typedef class State *Undo;
 /*論文で紹介されていたOpaque Pointerです。*/
 
-vector<State> vec;
-/*nopsとtmpは以下のdfsで使う変数です、vecは成功した場合のパスとして、交換過程を保存するvector<State>です。*/
+int num[16];
+int Y[16][4];
 
-/*以下のクラスは、論文の"Operator Pre-computation"の章に書かれていたoperator tableを表すクラスです。*/
-class Optab : public State
+void init(void)
 {
-private:
-  int Y[16][4];
-  int num[16];
-  /*Y[i]がblankがiの時にblankを交換させることのできるピースの位置を保存するvectorです。*/
-  /*例えば、Y[0]の場合だと、blank=0は左上を指しますから、1と4が入っています。*/
-
-public:
-  Optab()
+  for (int i = 0; i < 16; i++)
   {
-    for (int i = 0; i < 16; i++)
+    int c = -1;
+    if (i >= Width)
     {
-      int c = -1;
-      if (i >= Width)
-      {
-        Y[i][++c] = i - Width;
-      }
-      if (i % Width > 0)
-      {
-        Y[i][++c] = i - 1;
-      }
-      if (i % Width < Width - 1)
-      {
-        Y[i][++c] = i + 1;
-      }
-      if (i < Ntiles - Width)
-      {
-        Y[i][++c] = i + Width;
-      }
-      num[i] = ++c;
+      Y[i][++c] = i - Width;
     }
+    if (i % Width > 0)
+    {
+      Y[i][++c] = i - 1;
+    }
+    if (i % Width < Width - 1)
+    {
+      Y[i][++c] = i + 1;
+    }
+    if (i < Ntiles - Width)
+    {
+      Y[i][++c] = i + Width;
+    }
+    num[i] = ++c;
   }
-  /*論文の通りに実装したつもりです*/
-
-  int number(int i)
-  {
-    return num[i];
-  }
-  /*Y[i]に入っている数字の個数(=移動可能なパズルの状態の個数)を返すメソッドnumber*/
-
-  int op(int i, int j)
-  {
-    return Y[i][j];
-  }
-  /*Y[i]のj番目に入っている数字を返すメソッドop*/
-};
-
-Optab optab;
-
-int NOPS(State s)
-{
-  return optab.number(s.blank);
 }
-/*論文のFigure 3で書かれていた関数のNOPSです*/
-
-int NTHOP(State s, int n)
-{
-  return optab.op(s.blank, n);
-}
-/*論文のFigure 3で書かれていた関数のNTHOPSです*/
 
 int mdincr(int tile, int newblank, int blank)
 {
@@ -220,6 +182,7 @@ int tmp;
 int number;
 int nops;
 Undo u_;
+int answer;
 
 bool dfs(State x, int depth, int limit, int prev)
 {
@@ -236,12 +199,13 @@ bool dfs(State x, int depth, int limit, int prev)
   }
   /*xのf=g+hがlimitを超えたらその状態はダメなのでfalseを返します。*/
 
-  nops = NOPS(x);
+  nops = num[x.blank];
   /*State xから一回の交換によっていける状態の数をNOPSを使って計算します。それをnopsに入れます。*/
 
   for (int i = 0; i < nops; i++)
   {
-    u_ = APPLY(x, NTHOP(x, i));
+    tmp = Y[x.blank][i];
+    u_ = APPLY(x, tmp);
     number++;
     /*APPLYを使って交換します。xがダメだった時に戻れるように、uにxの交換前の状態を入れておきます。*/
 
@@ -255,7 +219,7 @@ bool dfs(State x, int depth, int limit, int prev)
     if (dfs(x, depth + 1, limit, u_->blank))
     {
       /*depthには、現在のdepthに１足したもの、prevには、交換前のblankの位置、つまりu->blankを入れて再帰の計算をします。もし成功したら、vecに入れて、true(=深さ優先探索が成功したことを意味する)を返します。*/
-      vec.push_back(x);
+      answer++;
       return true;
     }
   }
@@ -265,6 +229,7 @@ bool dfs(State x, int depth, int limit, int prev)
 
 bool search(State x)
 {
+  answer = 0;
   number = 0;
   chrono::system_clock::time_point start, end;
   start = chrono::system_clock::now();
@@ -285,7 +250,7 @@ bool search(State x)
       int num_per_tim = number / tim * 1000;
 
       printf("生成されたノードの総数は %d です\n", number);
-      printf("かかった時間は %.0d (sec) です\n", tim);
+      printf("かかった時間は %.0d (millisec) です\n", tim);
 
       printf("一秒間に展開されるノードの数は ");
       printf("%d", num_per_tim);
@@ -306,22 +271,17 @@ bool search(State x)
 
 int main(void)
 {
+  init();
+
   State x;
 
   x.input();
 
   if (search(x))
   {
-    int count = 0;
-    reverse(vec.begin(), vec.end());
-    for (vector<State>::iterator ite = vec.begin(); ite != vec.end(); ite++)
-    {
-      count++;
-      (*ite).show(count);
-    }
+    cout << "最短手は" << answer << "です\n";
   }
   else
     cout << "fail";
-
   return 0;
 }
