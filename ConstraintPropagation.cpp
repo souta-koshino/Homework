@@ -24,11 +24,13 @@ public:
 
   bool complete(void);
 
-  bool MAC(int);
+  pair<bool, Puzzle> MAC(int);
 
   bool REVISE(int, int);
 
   bool backtracking_search(int);
+
+  void check(void);
 };
 
 class Constraints
@@ -106,7 +108,7 @@ void Puzzle::input()
     }
     else
     {
-      A[i].second = {};
+      A[i].second.push_back(A[i].first);
     }
   }
 }
@@ -121,17 +123,18 @@ void Puzzle::output()
   }
   cout << endl
        << endl;
+}
 
+void Puzzle::check(void)
+{
   for (int i = 0; i < 81; i++)
   {
-    cout << i << "番目のDomainは";
     for (vector<int>::iterator ite = A[i].second.begin(); ite != A[i].second.end(); ite++)
     {
-      cout << *ite << " ";
+      cout << *ite;
     }
     cout << endl;
   }
-  cout << endl;
 }
 
 bool Puzzle::horizontal_check(int i, int n)
@@ -200,15 +203,15 @@ bool Puzzle::complete(void)
   return true;
 }
 
-bool Puzzle::MAC(int i)
+pair<bool, Puzzle> Puzzle::MAC(int i)
 {
-  A[i].second.clear();
   queue<pair<int, int>> Q;
+  const Puzzle B = *this;
 
   for (int j = 0; j < 81; j++)
   {
-    if (constraints.check(i, j) == 1 && A[i].first == 0)
-      Q.push(make_pair(i, j));
+    if (constraints.check(j, i) && A[j].first == 0)
+      Q.push(make_pair(j, i));
   }
 
   while (!Q.empty())
@@ -221,42 +224,48 @@ bool Puzzle::MAC(int i)
     if ((*this).REVISE(x, y))
     {
       if (A[x].second.size() == 0)
-      {
-        return false;
-      }
-
+        return make_pair(false, B);
       for (int k = 0; k < 81; k++)
       {
-        if (constraints.check(k, x) == 1 && k != y)
+        if (constraints.check(k, x) && k != y && A[k].first == 0)
         {
-          Q.push(make_pair(k, i));
+          Q.push(make_pair(k, x));
         }
       }
     }
   }
-  return true;
+  return make_pair(true, B);
 }
 
 bool Puzzle::REVISE(int i, int j)
 {
   bool revised = false;
-  bool mark = false;
 
+  vector<int> x;
   for (vector<int>::iterator ite = A[i].second.begin(); ite != A[i].second.end(); ite++)
   {
+    x.push_back(*ite);
+  }
+
+  for (vector<int>::iterator ite = x.begin(); ite != x.end(); ite++)
+  {
+    bool mark = true;
+
     for (vector<int>::iterator it = A[j].second.begin(); it != A[j].second.end(); it++)
     {
       if (*ite != *it)
       {
-        mark = true;
+        mark = false;
       }
     }
-    if (!mark)
+
+    if (mark)
     {
-      A[i].second.erase(ite);
+      A[i].second.erase(remove(A[i].second.begin(), A[i].second.end(), *ite), A[i].second.end());
       revised = true;
     }
   }
+
   return revised;
 }
 
@@ -276,32 +285,22 @@ bool Puzzle::backtracking_search(int i)
     return (*this).backtracking_search(i + 1);
   }
 
-  vector<int> x;
-
   for (vector<int>::iterator ite = A[i].second.begin(); ite != A[i].second.end(); ite++)
-  {
-    x.push_back(*ite);
-  }
-
-  for (vector<int>::iterator ite = x.begin(); ite != x.end(); ite++)
   {
     if ((*this).assign(i, *ite))
     {
       A[i].first = *ite;
-      A[i].second.clear();
 
-      (*this).output();
+      pair<bool, Puzzle> X = (*this).MAC(i);
 
-      if ((*this).MAC(i))
+      if (X.first)
       {
         if ((*this).backtracking_search(i + 1))
         {
           return true;
         }
+        *this = X.second;
       }
-
-      A[i].first = 0;
-      A[i].second = x;
     }
   }
   return false;
@@ -327,11 +326,14 @@ int main(void)
     x.output();
   }
   else
-    cout << "fail";
+  {
+    cout << "fail\n";
+    x.output();
+  }
 
   end = std::chrono::system_clock::now();
-  double tim = chrono::duration_cast<chrono::milliseconds>(end - start).count();
-  printf("かかった時間は %.f (millisec) です\n", tim);
+
+  cout << "かかった時間は" << chrono::duration_cast<chrono::milliseconds>(end - start).count() << "(millisec)です\n";
 
   return 0;
 }
