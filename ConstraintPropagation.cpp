@@ -24,7 +24,7 @@ public:
 
   bool complete(void);
 
-  pair<bool, Puzzle> MAC(int);
+  bool MAC(int);
 
   bool REVISE(int, int);
 
@@ -45,7 +45,11 @@ public:
     {
       for (int j = 0; j < 81; j++)
       {
-        if (i / 9 == j / 9)
+        if (i == j)
+        {
+          C[i][j] = 0;
+        }
+        else if (i / 9 == j / 9)
         {
           C[i][j] = 1;
         }
@@ -106,10 +110,6 @@ void Puzzle::input()
           A[i].second.push_back(n);
       }
     }
-    else
-    {
-      A[i].second.push_back(A[i].first);
-    }
   }
 }
 
@@ -127,14 +127,15 @@ void Puzzle::output()
 
 void Puzzle::check(void)
 {
+  int c = 0;
   for (int i = 0; i < 81; i++)
   {
     for (vector<int>::iterator ite = A[i].second.begin(); ite != A[i].second.end(); ite++)
     {
-      cout << *ite;
+      c += *ite;
     }
-    cout << endl;
   }
+  cout << c << endl;
 }
 
 bool Puzzle::horizontal_check(int i, int n)
@@ -203,10 +204,11 @@ bool Puzzle::complete(void)
   return true;
 }
 
-pair<bool, Puzzle> Puzzle::MAC(int i)
+bool Puzzle::MAC(int i)
 {
+  A[i].second.clear();
+
   queue<pair<int, int>> Q;
-  const Puzzle B = *this;
 
   for (int j = 0; j < 81; j++)
   {
@@ -224,7 +226,7 @@ pair<bool, Puzzle> Puzzle::MAC(int i)
     if ((*this).REVISE(x, y))
     {
       if (A[x].second.size() == 0)
-        return make_pair(false, B);
+        return false;
       for (int k = 0; k < 81; k++)
       {
         if (constraints.check(k, x) && k != y && A[k].first == 0)
@@ -234,36 +236,47 @@ pair<bool, Puzzle> Puzzle::MAC(int i)
       }
     }
   }
-  return make_pair(true, B);
+  return true;
 }
 
 bool Puzzle::REVISE(int i, int j)
 {
   bool revised = false;
 
-  vector<int> x;
-  for (vector<int>::iterator ite = A[i].second.begin(); ite != A[i].second.end(); ite++)
-  {
-    x.push_back(*ite);
-  }
+  vector<int> cancel;
 
-  for (vector<int>::iterator ite = x.begin(); ite != x.end(); ite++)
+  for (vector<int>::iterator ite = A[i].second.begin(); ite != A[i].second.end(); ite++)
   {
     bool mark = true;
 
-    for (vector<int>::iterator it = A[j].second.begin(); it != A[j].second.end(); it++)
+    if (A[j].second.begin() == A[j].second.end())
     {
-      if (*ite != *it)
+      if (*ite != A[j].first)
       {
         mark = false;
       }
     }
-
-    if (mark)
+    else
     {
-      A[i].second.erase(remove(A[i].second.begin(), A[i].second.end(), *ite), A[i].second.end());
-      revised = true;
+      for (vector<int>::iterator it = A[j].second.begin(); it != A[j].second.end(); it++)
+      {
+        if (*ite != *it)
+        {
+          mark = false;
+        }
+      }
+
+      if (mark)
+      {
+        cancel.push_back(*ite);
+        revised = true;
+      }
     }
+  }
+
+  for (vector<int>::iterator ite = cancel.begin(); ite != cancel.end(); ite++)
+  {
+    A[i].second.erase(remove(A[i].second.begin(), A[i].second.end(), *ite), A[i].second.end());
   }
 
   return revised;
@@ -289,18 +302,19 @@ bool Puzzle::backtracking_search(int i)
   {
     if ((*this).assign(i, *ite))
     {
+      const Puzzle X = *this;
+
       A[i].first = *ite;
 
-      pair<bool, Puzzle> X = (*this).MAC(i);
-
-      if (X.first)
+      if ((*this).MAC(i))
       {
         if ((*this).backtracking_search(i + 1))
         {
           return true;
         }
-        *this = X.second;
       }
+
+      *this = X;
     }
   }
   return false;
@@ -313,10 +327,12 @@ int main(void)
 
   Puzzle x;
   x.input();
+  x.check();
 
   cout << "The problem is below" << endl;
 
   x.output();
+  x.check();
 
   cout << endl;
 
@@ -330,6 +346,7 @@ int main(void)
     cout << "fail\n";
     x.output();
   }
+  x.check();
 
   end = std::chrono::system_clock::now();
 
