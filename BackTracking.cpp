@@ -1,8 +1,7 @@
 #include <iostream>
 #include <vector>
-#include <set>
+#include <chrono>
 #include <queue>
-#include <functional>
 using namespace std;
 
 class Puzzle
@@ -162,6 +161,9 @@ bool backtracking_search(Puzzle &puzzle, int i, int j)
 
 int main(void)
 {
+  chrono::system_clock::time_point start, end;
+  start = chrono::system_clock::now();
+
   Puzzle x;
   x.input();
 
@@ -180,5 +182,10 @@ int main(void)
   {
     cout << "fail";
   }
+
+  end = std::chrono::system_clock::now();
+
+  cout << "かかった時間は" << chrono::duration_cast<chrono::milliseconds>(end - start).count() << "(millisec)です\n";
+
   return 0;
 }
