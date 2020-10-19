@@ -144,3 +144,8 @@ int main(void)
 
   return 0;
 }
+
+/*
+参考にしたサイト
+https://sites.google.com/site/haioushen/search-algorithm/solvean-queensproblemusingsatsolver
+*/
